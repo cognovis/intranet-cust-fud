@@ -1,0 +1,710 @@
+# /packages/intranet-cust-fud/reports/fud-finance-month_PMFL.tcl
+#
+# Copyright (c) 2003-2006 ]project-open[
+#
+# All rights reserved. 
+# Please see http://www.project-open.com/ for licensing.
+
+
+
+# ------------------------------------------------------------
+# Page Contract 
+#
+# FUD PM-Umsatz-REPORT basiert auf report-tut05
+#
+
+ad_page_contract {
+    FUD Monthly Report per PM
+    This reports lists all projects in a time interval of months
+    It is one of the easiest reports imaginable...
+
+    @param year Year (YYYY format) 
+    @param month Month (MM format)
+    
+} {
+    { year "" }
+    { month "" }
+   
+    { start_date "" }
+    { end_date "" }
+    { level_of_detail:integer 1 }
+    { customer_id:integer 0 }
+   
+}
+
+
+# ------------------------------------------------------------
+# Security (New!)
+#
+# The access permissions for the report are taken from the
+# "im_menu" Menu Items in the "Reports" section that link 
+# to this report. It's just a convenient way to handle 
+# security, that avoids errors (different rights for the 
+# Menu Item then for the report) and redundancy.
+
+# What is the "label" of the Menu Item linking to this report?
+set menu_label "fud-reporting-finance-month_PMFL"
+
+# Get the current user and make sure that he or she is
+# logged in. Registration is handeled transparently - 
+# the user is redirected to this URL after registration 
+# if he wasn't logged in.
+set current_user_id [ad_maybe_redirect_for_registration]
+
+
+# Determine whether the current_user has read permissions. 
+# "db_string" takes a name as the first argument 
+# ("report_perms") and then executes the SQL statement in 
+# the second argument. 
+# It returns an error if there is more then one result row.
+# im_object_permission_p is a PlPg/SQL procedure that is 
+# defined as part of ]project-open[.
+set read_p [db_string report_perms "
+	select	im_object_permission_p(m.menu_id, :current_user_id, 'read')
+	from	im_menus m
+	where	m.label = :menu_label
+" -default 'f']
+
+
+
+# For testing - set manually
+#set read_p "t"
+
+# Write out an error message if the current user doesn't
+# have read permissions and abort the execution of the
+# current screen.
+if {![string equal "t" $read_p]} {
+    set message "You don't have the necessary permissions to view this page"
+    ad_return_complaint 1 "<li>$message"
+    ad_script_abort
+}
+
+### ------------------------------------------------------------
+### Set the default start and end date
+
+##set days_in_past 0
+
+##db_1row todays_date "
+##select
+##	to_char(sysdate::date - :days_in_past::integer, 'YYYY') as todays_year,
+##	to_char(sysdate::date - :days_in_past::integer, 'MM') as todays_month,
+##	to_char(sysdate::date - :days_in_past::integer, 'DD') as todays_day
+##from dual
+##"
+
+##if {"" == $start_date} { 
+##    set start_date "$todays_year-$todays_month-01"
+##}
+
+##db_1row end_date "
+##select
+##	to_char(to_date(:start_date, 'YYYY-MM-DD') + 31::integer, 'YYYY') as end_year,
+##	to_char(to_date(:start_date, 'YYYY-MM-DD') + 31::integer, 'MM') as end_month,
+##	to_char(to_date(:start_date, 'YYYY-MM-DD') + 31::integer, 'DD') as end_day
+##from dual
+##"
+
+##if {"" == $end_date} { 
+##    set end_date "$end_year-$end_month-01"
+##}
+
+##db_1row todays_month "
+##select
+##	
+##	(SELECT EXTRACT (MONTH FROM sysdate::date)) AS todays_month
+##from dual
+##"
+
+
+# ------------------------------------------------------------
+# Set the default year and month
+
+set days_in_past 0
+
+db_1row todays_date "
+select
+	to_char(sysdate::date - :days_in_past::integer, 'YYYY') as todays_year,
+	to_char(sysdate::date - :days_in_past::integer, 'MM') as todays_month,
+	to_char(sysdate::date - :days_in_past::integer, 'DD') as todays_day
+from dual
+"
+
+if {"" == $year} { 
+    set year "$todays_year"
+}
+
+if {"" == $month} { 
+    set month "$todays_month"
+}
+
+
+
+
+# ------------------------------------------------------------
+# Check Parameters (New!)
+#
+# Check that start_date and end_date have correct format.
+# We are using a regular expression check here for convenience.
+
+
+if {"" != $start_date && ![regexp {^[0-9][0-9][0-9][0-9]\-[0-9][0-9]\-[0-9][0-9]$} $start_date]} {
+    ad_return_complaint 1 "Start Date doesn't have the right format.<br>
+    Current value: '$start_date'<br>
+    Expected format: 'YYYY-MM-DD'"
+}
+
+if {"" != $end_date && ![regexp {^[0-9][0-9][0-9][0-9]\-[0-9][0-9]\-[0-9][0-9]$} $end_date]} {
+    ad_return_complaint 1 "End Date doesn't have the right format.<br>
+    Current value: '$end_date'<br>
+    Expected format: 'YYYY-MM-DD'"
+}
+
+if {"" != $year && ![regexp {^[2][0][0-3][0-9]$} $year]} {
+    ad_return_complaint 1 "Year doesn't have the right format.<br>
+    Current value: '$year'<br>
+    Expected format: 'YYYY'"
+}
+
+if {"" != $month && ![regexp {^[0-1][0-9]$} $month]} {
+    ad_return_complaint 1 "Month doesn't have the right format.<br>
+    Current value: '$month'<br>
+    Expected format: 'MM'"
+}
+
+
+# Maxlevel is 3. 
+if {$level_of_detail > 2} { set level_of_detail 2 }
+
+
+
+
+# ------------------------------------------------------------
+# Page Title, Bread Crums and Help
+#
+# We always need a "page_title".
+# The "context_bar" defines the "bread crums" at the top of the
+# page that allow a user to return to the home page and to
+# navigate the site.
+# Every reports should contain a "help_text" that explains in
+# detail what exactly is shown. Reports can get very messy and
+# it can become very difficult to interpret the data shown.
+#
+
+set page_title "Provision nach Monaten"
+set context_bar [im_context_bar $page_title]
+set help_text "
+	<strong>Provision</strong><br>
+	
+	<br>
+	<br>
+	<br>
+	<br>
+	
+"
+
+
+# ------------------------------------------------------------
+# Default Values and Constants
+#
+# In this section we define constants and default variables
+# that are used in the sections further below.
+#
+
+# Default report line formatting - alternating between the
+# CSS styles "roweven" (grey) and "rowodd" (lighter grey).
+#
+set rowclass(0) "roweven"
+set rowclass(1) "rowodd"
+
+# Variable formatting - Default formatting is quite ugly
+# normally. In the future we will include locale specific
+# formatting. 
+#
+set currency_format "999,999,999.09"
+set date_format "YYYY-MM-DD"
+
+# Set URLs on how to get to other parts of the system
+# for convenience. (New!)
+# This_url includes the parameters passed on to this report.
+#
+set company_url "/intranet/companies/view?company_id="
+set project_url "/intranet/projects/view?project_id="
+set invoice_url "/intranet-invoices/view?invoice_id="
+set user_url "/intranet/users/view?user_id="
+set this_url [export_vars -base "/intranet-reporting-finance/fud-finance-month_PM.tcl
+" {year month} ]
+
+# Level of Details
+# Determines the LoD of the grouping to be displayed
+#
+#set levels {2 "Months only" 3 "Months+Projects"} 
+set levels {2 "Months only"}
+
+#Default currency
+set default_currency [ad_parameter -package_id [im_package_cost_id] "DefaultCurrency" "" "EUR"]
+
+
+
+##### pmfl beteiligungs-satz################################
+# chiara,jan 0,15%
+# rest 0,2%
+#
+set commission_perc_group1 "0.0015"
+set commission_perc_group2 "0.002"
+set commission_perc_group1_members "'552979','175834','552987','647939'"
+# mareike:552979,jan:175834,florencia:552987,isabelle:647939
+set commission_perc_group2_members "'175824','175829','797221'"
+# joaquin:175824,kathyM:175829,luzia:797221
+############################################################
+
+
+
+# ------------------------------------------------------------
+# Report SQL - This SQL statement defines the raw data 
+# that are to be shown.
+#
+# This section is usually the starting point when starting 
+# any new report.
+# Once your SQL is fine you you start adding formatting, 
+# grouping and filters to create a "real-world" report.
+#
+
+
+# ------------------------------------------------------------
+# Conditional SQL Where-Clause
+#
+
+set criteria [list]
+
+##if {[info exists project_manager_id]} {
+##    lappend criteria "p.project_lead_id = :project_manager_id"
+##}
+
+if {[info exists project_id]} {
+    lappend criteria "p.project_id = :project_id"
+}
+
+# Select project & subprojects
+if {[info exists project_id]} {
+    lappend criteria "p.project_id in (
+	select
+		p.project_id
+	from
+		im_projects p,
+		im_projects parent_p
+	where
+		parent_p.project_id = :project_id
+		and p.tree_sortkey between parent_p.tree_sortkey and tree_right(parent_p.tree_sortkey)
+    )"
+}
+
+set where_clause [join $criteria " and\n            "]
+if { ![empty_string_p $where_clause] } {
+    set where_clause " and $where_clause"
+}
+
+
+
+
+set customer_sql ""
+if {0 != $customer_id} {
+    set customer_sql "and p.company_id = :customer_id\n"
+}
+
+
+
+
+set inner_sql "
+select
+		c.cost_id,
+		c.cost_type_id,
+		c.cost_status_id,
+		c.cost_nr,
+		c.cost_name,
+		c.effective_date,
+		c.customer_id,
+		c.provider_id,
+		round((c.paid_amount * 
+		  im_exchange_rate(c.effective_date::date, c.currency, 'EUR')) :: numeric
+		  , 2) as paid_amount_converted,
+		c.paid_amount,
+		c.paid_currency,
+		round((c.amount * 
+		  im_exchange_rate(c.effective_date::date, c.currency, 'EUR')) :: numeric
+	  , 2) as amount_converted,
+		c.amount,
+		c.currency,
+		r.object_id_one as project_id
+	from
+		im_costs c
+		LEFT OUTER JOIN acs_rels r on (c.cost_id = r.object_id_two)
+	where
+		c.cost_type_id = '3700'
+		and (SELECT EXTRACT (YEAR FROM c.effective_date)) = $year
+		and (SELECT EXTRACT (MONTH FROM c.effective_date)) = $month
+		
+
+"
+
+
+set report_sql "
+select
+	 CASE 	WHEN '$current_user_id' IN ($commission_perc_group1_members) THEN round((c.amount_converted * $commission_perc_group1) :: numeric, 2 ) 
+		WHEN  '$current_user_id' IN ($commission_perc_group2_members) THEN round((c.amount_converted * $commission_perc_group2) :: numeric, 2 )  
+       ELSE NULL
+  END as commission, 
+	c.*,
+	
+	to_char(c.effective_date, 'DDMMYY') as inv_date_formatted,
+	(SELECT EXTRACT (YEAR FROM c.effective_date)) AS year,
+	(SELECT EXTRACT (MONTH FROM c.effective_date)) AS month,
+	 
+	
+	c.amount_converted as invoices,
+	round((c.amount * 
+	  im_exchange_rate(c.effective_date::date, c.currency, 'EUR')) :: numeric
+	  , 2) as amount_converted,
+	p.project_name,
+	p.project_nr,
+	p.project_status_id
+from	
+	($inner_sql) c
+
+	LEFT OUTER JOIN im_projects p on (c.project_id = p.project_id)
+	LEFT OUTER JOIN im_companies cust on (c.customer_id = cust.company_id)
+	
+where
+	1 = 1
+	--$where_clause
+	and p.project_lead_id is not null
+	
+order by
+	year DESC,
+	month DESC
+
+"
+
+# ------------------------------------------------------------
+# Report Definition
+#
+# Reports are defined in a "declarative" style. The definition
+# consists of a number of fields for header, lines and footer.
+
+# Global Header Line
+set header0 {
+	"Jahr"	
+	"Monat" 
+	"Provision"	
+	
+	
+	
+}
+
+# The entries in this list include <a HREF=...> tags
+# in order to link the entries to the rest of the system (New!)
+#
+
+
+
+set report_def [list \
+    group_by month \
+    header {
+	<b>$year</b>
+	"\#colspan=9 
+	<b>$month</b>"
+    } \
+        content [list \
+            group_by project_id \
+            header { } \
+	    content [list \
+		    header {
+			""
+			""
+			
+			""
+			
+		    } \
+		    content {} \
+	    ] \
+            footer {
+            } \
+    ] \
+    footer {  
+    		
+		""
+		"<nobr><i>Monat Total:</i></nobr>"
+		"<nobr><i>$commission_subtotal $default_currency</i></nobr>" 
+		  
+     } \
+]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Global Footer Line
+set footer0 {
+	"" 
+	"" 
+	"" 
+	
+	
+	
+}
+
+
+# ------------------------------------------------------------
+# Counters (New!)
+#
+# Counters are used to present totals and subtotals.
+# Counters consist of several parts:
+#	- A "pretty_name"
+#	- A "var" variable. This variable can be used
+#	  in the report to refer to the value of the counter.
+#	- A "reset" condition. 
+#	  The value of the counter will be reset to 0
+#	  every time the value of this expression _changes_.
+#	  This allows to define several levels of counters.
+#	- An "expr" expression that is to be evaluated.
+#
+# The counters are updated inside the Main Report Loop with
+# variables from the SQL query.
+#
+# Please note the "+0" part in all the counters. This is
+# a trick to deal with possible null (empty) values of the
+# numeric fields. In this case the "+0" is just evaluated
+# to "0".
+
+#
+# Subtotal Counters (per project)
+#
+
+set commission_subtotal_counter [list \
+        pretty_name "Commission Amount" \
+        var commission_subtotal \
+        reset \$month \
+        expr "\$commission+0" \
+]
+
+#
+# Grand Total Counters
+#
+set commission_grand_total_counter [list \
+        pretty_name "Commission Amount" \
+        var commission_total \
+        reset 0 \
+        expr "\$commission+0" \
+]
+
+
+
+set counters [list \
+	$commission_subtotal_counter \
+	$commission_grand_total_counter \
+]
+
+
+# Set the values to 0 as default (New!)
+set commission_total 0
+
+
+
+
+# ------------------------------------------------------------
+# Start Formatting the HTML Page Contents
+#
+# Writing out a report can take minutes and hours, so we are
+# writing out the HTML contents incrementally to the HTTP 
+# connection, allowing the user to read the first lines of the
+# report (in particular the help_text) while the rest of the
+# report is still being calculated.
+#
+
+# Write out the report header with Parameters
+# We use simple "input" type of fields for start_date 
+# and end_date with default values coming from the input 
+# parameters (the "value='...' section).
+#
+
+#
+ad_return_top_of_page "
+	[im_header]
+	[im_navbar]
+	
+	<table cellspacing=0 cellpadding=0 border=0>
+	<tr valign=top>
+	  <td width='30%'>
+		<!-- 'Filters' - Show the Report parameters -->
+		<form>
+		<table cellspacing=2>
+		<tr class=rowtitle>
+		  <td class=rowtitle colspan=2 align=center>Filters</td>
+		</tr>
+		<!-- 
+		<tr>
+		  <td>Level of<br>Details</td>
+		  <td>
+		    [im_select -translate_p 0 level_of_detail $levels $level_of_detail]
+		  </td>
+		</tr>
+		-->
+
+		  <td><nobr>Jahr (YYYY):</nobr></td>
+		  <td><input type=text name=year value='$year'></td>
+		</tr>
+		<tr>
+
+		  <td><nobr>Monat (MM):</nobr></td>
+		  <td><input type=text name=month value='$month'></td>
+		</tr>
+		
+		<tr>
+		  <td</td>
+		  <td><input type=submit value='Submit'></td>
+		</tr>
+		</table>
+		</form>
+	  </td>
+	  <td align=center>
+	
+		<table cellspacing=2 width='90%'>
+		<tr>
+		  <td>$help_text</td>
+		</tr>
+		</table>
+	
+
+	  </td>
+	</tr>
+	</table>
+	
+	<!-- Here starts the main report table -->
+	<table border=0 cellspacing=2 cellpadding=1>
+"
+
+# The following report loop is "magic", that means that 
+# you don't have to fully understand what it does.
+# It loops through all the lines of the SQL statement,
+# calls the Report Engine library routines and formats 
+# the report according to the report_def definition.
+
+set footer_array_list [list]
+set last_value_list [list]
+
+im_report_render_row \
+    -row $header0 \
+    -row_class "rowtitle" \
+    -cell_class "rowtitle"
+
+set counter 0
+set class ""
+db_foreach sql $report_sql {
+
+	# Select either "roweven" or "rowodd" from
+	# a "hash", depending on the value of "counter".
+	# You need explicite evaluation ("expre") in TCL
+	# to calculate arithmetic expressions. 
+	set class $rowclass([expr $counter % 2])
+	
+	
+	##FUD: if project_status_id is canceled "83" 	13732.31 	
+#	if {"83" == $project_status_id} {
+#	    set project_nr "<font color=red><s>$project_nr</s> canceled</font>"
+#	    set project_manager_name "<font color=red><s>$project_manager_name</s></font>"
+#	    set invoices "<font color=red><s>$invoices</s></font>"
+
+#	    
+#	}
+
+
+	##FUD: if invoice is 0.00 then color->red
+	
+	#if { "0.00" == $invoices } {
+	#    set invoices "<font color=red>$invoices</font>"
+	#}	
+	# Restrict the length of the project_name to max.
+	# 40 characters. (New!)
+	set project_name [string_truncate -len 40 $project_name]
+
+	im_report_display_footer \
+	    -group_def $report_def \
+	    -footer_array_list $footer_array_list \
+	    -last_value_array_list $last_value_list \
+	    -level_of_detail $level_of_detail \
+	    -row_class $class \
+	    -cell_class $class
+	
+	if {"83" != $project_status_id} {
+	im_report_update_counters -counters $counters
+	}
+	# Calculated Variables (New!)
+##	set po_per_quote_perc "undef"
+##	if {[expr $quote_subtotal+0] != 0} {
+##	  set po_per_quote_perc [expr int(10000.0 * $po_subtotal / $quote_subtotal) / 100.0]
+##	  set po_per_quote_perc "$po_per_quote_perc %"
+##	}
+##	set gross_profit [expr $invoice_subtotal - $bill_subtotal]
+
+	set last_value_list [im_report_render_header \
+	    -group_def $report_def \
+	    -last_value_array_list $last_value_list \
+	    -level_of_detail $level_of_detail \
+	    -row_class $class \
+	    -cell_class $class
+	]
+
+	set footer_array_list [im_report_render_footer \
+	    -group_def $report_def \
+	    -last_value_array_list $last_value_list \
+	    -level_of_detail $level_of_detail \
+	    -row_class $class \
+	    -cell_class $class
+	]
+
+	incr counter
+}
+
+im_report_display_footer \
+    -group_def $report_def \
+    -footer_array_list $footer_array_list \
+    -last_value_array_list $last_value_list \
+    -level_of_detail $level_of_detail \
+    -display_all_footers_p 1 \
+    -row_class $class \
+    -cell_class $class
+
+im_report_render_row \
+    -row $footer0 \
+    -row_class $class \
+    -cell_class $class \
+    -upvar_level 1
+
+
+# Write out the HTMl to close the main report table
+# and write out the page footer.
+#
+ns_write "
+	</table>
+	[im_footer]
+"
+
