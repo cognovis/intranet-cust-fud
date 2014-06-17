@@ -10,12 +10,12 @@
     <inherit-templates-p>f</inherit-templates-p>
     <auto-mount>intranet-cust-fud</auto-mount>
     
-    <version name="4.0.3.0.1" url="http://openacs.org/repository/download/apm/intranet-cust-fud-4.0.3.0.1.apm">
+    <version name="4.0.3.0.2" url="http://openacs.org/repository/download/apm/intranet-cust-fud-4.0.3.0.2.apm">
         <owner url="mailto:malte.sussdorff@cognovis.de">Malte Sussdorff</owner>
         <summary>Custom Package for FUD</summary>
         <maturity>0</maturity>
 
-        <provides url="intranet-cust-fud" version="4.0.3.0.1"/>
+        <provides url="intranet-cust-fud" version="4.0.3.0.2"/>
 
         <callbacks>
         </callbacks>
