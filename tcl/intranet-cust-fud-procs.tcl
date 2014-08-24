@@ -158,11 +158,15 @@ ad_proc -public fud_create_invoice_pdf {
             $customer_or_provider_join
     "
 
-    db_1row office_info_query "
+    if {![db_0or1row office_info_query "
         select *
         from im_offices
         where office_id = :invoice_office_id
-    "
+    "]} {
+	ns_log Notice "No office found for $invoice_id :: $invoice_office_id :: $company_name"
+	return
+	ad_script_abort
+    }
 
     # ---------------------------------------------------------------
     # Check if this is an ODT template, otherwise stop
@@ -621,7 +625,9 @@ ad_proc -public fud_create_invoice_pdf {
             if { "" != $var_to_be_escaped  } {
                 if { [info exists $var_to_be_escaped] } {
                     set value [eval "set value \"$$var_to_be_escaped\""]
-                    set cmd "set $var_to_be_escaped \"[encodeXmlValue $value]\""
+		    set value [encodeXmlValue $value]
+		    regsub -all {\"} $value {'} value
+                    set cmd "set $var_to_be_escaped \"$value\""
                     eval $cmd
                 }
             }
@@ -694,6 +700,8 @@ ad_proc -public fud_create_invoice_pdf {
     
     # convert the PDF
     intranet_oo::jodconvert -oo_file $odt_zip -output_file $output_file
+
+    ns_log Notice "FUD Invoices:: Created $output_file"
     return $output_file
     
 }
