@@ -76,15 +76,54 @@ set return_url [im_url_with_query]
 set amp "&"
 set cur_format [im_l10n_sql_currency_format]
 set date_format [im_l10n_sql_date_format]
-set local_url "/intranet-invoices/list"
+set local_url "/intranet-cust-fud/reports/etm_invoice_list"
 set cost_status_created [im_cost_status_created]
 set cost_type [db_string get_cost_type "select category from im_categories where category_id=:cost_type_id" -default [_ intranet-invoices.Costs]]
 set letter [string toupper $letter]
 
-if {![im_permission $user_id view_invoices]} {
-    ad_return_complaint 1 "<li>You have insufficiente privileges to view this page"
+
+#Security view_invoices abfrage
+#if {![im_permission $user_id view_invoices]} {
+#    ad_return_complaint 1 "<li>You have insufficiente privileges to view this page"
+#    return
+#}
+
+
+# ------------------------------------------------------------
+# Security by menu entry
+
+# Label: Provides the security context for this report
+# because it identifies unquely the report's Menu and
+# its permissions.
+set current_user_id [ad_maybe_redirect_for_registration]
+#set menu_label "etm-bh_FLBillSum"
+#set menu_label "etm-bh_transferExp"
+# label von etm-pmfl-openPOs da kein eigener Menue-Eintrag, sondern als Link auf der Seite openPOs
+set menu_label "etm_invoice_list"
+
+set read_p [db_string report_perms "
+	select	im_object_permission_p(m.menu_id, :current_user_id, 'read')
+	from	im_menus m
+	where	m.label = :menu_label
+" -default 'f']
+
+if {![string equal "t" $read_p]} {
+    ad_return_complaint 1 "<li>
+[lang::message::lookup "" intranet-reporting.You_dont_have_permissions "You don't have the necessary permissions to view this page"]"
     return
 }
+
+
+
+
+
+
+
+
+
+
+
+
 
 if { [empty_string_p $how_many] || $how_many < 1 } {
     set how_many [ad_parameter -package_id [im_package_core_id] NumberResultsPerPage  "" 50]
@@ -163,7 +202,7 @@ if {"" != $start_date} {
     lappend criteria "i.effective_date >= :start_date::timestamptz"
 }
 if {"" != $end_date} {
-    lappend criteria "i.effective_date < :end_date::timestamptz"
+    lappend criteria "i.effective_date <= :end_date::timestamptz"
 }
 
 
@@ -260,6 +299,7 @@ select
 	ci.paid_amount as payment_amount,
 	to_char(ci.paid_amount,:cur_format) as payment_amount_formatted,
 	ci.paid_currency as payment_currency,
+	ci.note,
 	pr.project_nr,
 	to_char(ci.effective_date, 'YYYY-MM') as effective_month,
 	to_char(ci.amount * (1 + coalesce(ci.vat,0)/100 + coalesce(ci.tax,0)/100), :cur_format) as invoice_amount_formatted,
@@ -385,7 +425,7 @@ if {"" != $parent_menu_label} {
 # return a table with a form in it (if there are too many
 # options
 set filter_html "
-	<form method=get action=\"/intranet-invoices/list\">
+	<form method=get action=\"/intranet-cust-fud/reports/etm_invoice_list\">
 	[export_form_vars order_by how_many view_name include_subinvoices_p]
 	<table border=0 cellpadding=1 cellspacing=1>
 	  <tr>
@@ -477,10 +517,10 @@ db_foreach invoices_info_query $selection {
 	set url_string "<a href=\"$url\">$url</a>"
     }
 
-    # Don't show paid invices over due in red:
+    # show paid invoices over due in red:
     if {$invoice_status_id == [im_cost_status_paid] || \
 	$invoice_status_id == [im_cost_status_filed]} {
-	set overdue 0
+	set overdue 1
     }
 
     # paid_amount="" => paid_amount=0
@@ -574,7 +614,7 @@ set button_html "
   </td>
 </tr>"
 
-set sub_navbar [im_costs_navbar "no_alpha" "/intranet-invoices/list" $next_page_url $previous_page_url [list invoice_status_id cost_type_id company_id start_idx order_by how_many view_name start_date end_date] $parent_menu_label ]
+set sub_navbar [im_costs_navbar "no_alpha" "/intranet-cust-fud/reports/etm_invoice_list" $next_page_url $previous_page_url [list invoice_status_id cost_type_id company_id start_idx order_by how_many view_name start_date end_date] $parent_menu_label ]
 
 set left_navbar_html "
             <div class='filter-block'>

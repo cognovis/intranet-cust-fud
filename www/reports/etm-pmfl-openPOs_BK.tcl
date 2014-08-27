@@ -1,4 +1,4 @@
-# /packages/intranet-reporting-finance/www/etm-pmfl-openPOs.tcl
+# /packages/intranet-reporting-finance/www/fud-accountancy-openBills.tcl
 #
 # Copyright (c) 2003-2006 ]project-open[
 #
@@ -176,8 +176,7 @@ set invoice_url "/intranet-invoices/view?invoice_id="
 set user_url "/intranet/users/view?user_id="
 set this_url [export_vars -base "/intranet-reporting-finance/fud-accountancy-openBills" {start_date end_date} ]
 
-#set po2bill_source_url "/intranet-invoices/new-copy?source_invoice_id="
-set po2bill_source_url "/intranet-invoices/new-merge-invoiceselect?target_cost_type_id=3704&source_cost_type_id=3706&cost_status_id=3804&customer_id=8720&provider_id="
+set po2bill_source_url "/intranet-invoices/new-copy?source_invoice_id="
 set po2bill_target_url "&target_cost_type_id=3704&return_url=/intranet/invoices/view?invoice_id="
 
 set flbill_sum_url "/intranet-cust-fud/reports/etm-bh_FLBillSum?&pmfl=$current_user_id&effective_or_creation_date=creation&level_of_detail=3"
@@ -553,7 +552,7 @@ db_foreach sql $report_sql {
 
 
 	if {"" == $bill} {
-		set billperpo_nr "<a href='$po2bill_source_url$provider_id'><font color=red><strong>Bill anlegen</strong></font></a>"
+		set billperpo_nr "<a href='$po2bill_source_url$po_id$po2bill_target_url'><font color=red><strong>Bill anlegen</strong></font></a>"
 		} 	else {
 				set billperpo_nr "<strong>$bill</strong></a>"		
 			}

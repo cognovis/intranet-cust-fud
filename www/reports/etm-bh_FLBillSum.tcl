@@ -1,4 +1,4 @@
-# /packages/intranet-cust-fud/www/reports/etm-bh-fordg-verbindlkt.tcl
+# /packages/intranet-cust-fud/www/reports/etm-bh-FLBillSum.tcl
 #
 # Copyright (C) 2003 - 2009 ]project-open[
 #
@@ -13,15 +13,15 @@ ad_page_contract {
 } {
     { start_date "" }
     { end_date "" }
-    { level_of_detail 1 }
-    { agent "fud_alle" }
+    { level_of_detail:integer 3 }
+    { agent "all" }
     { output_format "html" }
     { number_locale "" }
     { customer_id:integer 0}
     { provider_id:integer 0 }
-    { creation_user: 0 }
     { effective_or_creation_date "" }
-    { incl_paid "" }
+    { incl_paid "open_only" }
+    { pmfl:integer 0}
 }
 
 # ------------------------------------------------------------
@@ -31,7 +31,10 @@ ad_page_contract {
 # because it identifies unquely the report's Menu and
 # its permissions.
 set current_user_id [ad_maybe_redirect_for_registration]
-set menu_label "etm-bh_transferExp"
+#set menu_label "etm-bh_FLBillSum"
+#set menu_label "etm-bh_transferExp"
+# label von etm-pmfl-openPOs da kein eigener Menue-Eintrag, sondern als Link auf der Seite openPOs
+set menu_label "etm-pmfl-openPOs"
 
 set read_p [db_string report_perms "
 	select	im_object_permission_p(m.menu_id, :current_user_id, 'read')
@@ -48,6 +51,7 @@ if {![string equal "t" $read_p]} {
 
 # ------------------------------------------------------------
 # Defaults
+#set pmfl :current_user_id
 
 set rowclass(0) "roweven"
 set rowclass(1) "rowodd"
@@ -61,13 +65,16 @@ if {"" == $number_locale} { set number_locale $locale  }
 set company_url "/intranet/companies/view?company_id="
 set invoice_url "/intranet-invoices/view?invoice_id="
 set user_url "/intranet/users/view?user_id="
-set this_url [export_vars -base "/intranet-cust-fud/reports/etm-bh_transferExp" {start_date end_date} ]
-
+set this_url [export_vars -base "/intranet-cust-fud/reports/etm-bh_FLBillSum" {start_date end_date} ]
+set openpo_url "/intranet-cust-fud/reports/etm-pmfl-openPOs?show_bills=0&provider_id="
 
 # Deal with invoices related to multiple projects
 im_invoices_check_for_multi_project_invoices
 
-
+# Level
+set levels {2 "nur FLRg" 3 "FL-Rg+Auftraege"} 
+# Maxlevel is 3. 
+if {$level_of_detail > 3} { set level_of_detail 3 }
 # ------------------------------------------------------------
 # Constants
 #
@@ -75,7 +82,7 @@ im_invoices_check_for_multi_project_invoices
 
 
 # Show all details for this report (no grouping)
-set level_of_detail 1
+#set level_of_detail 1
 
 # ETM: agent und VLL oder FLL
 set agentauswahl {all "Alle" fud_iban "FUD IBAN" fud_rest "FUD Rest" fud_alle "FUD Alle" pan_iban "PAN IBAN" pan_rest "PAN Rest" pan_alle "PAN Alle" zis_iban "ZIS IBAN" zis_rest "ZIS Rest" zis_alle "ZIS Alle" } 
@@ -83,8 +90,31 @@ set agentauswahl {all "Alle" fud_iban "FUD IBAN" fud_rest "FUD Rest" fud_alle "F
 # nach Rg.Datum oder nach Eingabedatum
 set effective_or_creation_date_auswahl {creation "Eingangs-Datum" effective "Rg-Datum"} 
 
-# bezahlte Rg (nicht) anzeigen
-set incl_paid_auswahl {incl_paid "inkl bezahlt&ohne RgName" open_only "nur offene mit RgName"} 
+# bezahle Rg (nicht) anzeigen
+set incl_paid_auswahl {incl_paid "inkl bezahlt" open_only "nur offene Rg.en"} 
+
+
+# Get the list of everybody who once created POs or Bills
+#set pmfl_options [db_list_of_lists pmfl "
+#    select * from (
+#	select
+#		im_name_from_id(user_id) as user_name ,
+#		user_id
+#	from
+#		users_active u,
+#		(select member_id 
+#		from group_distinct_member_map m 
+#		where group_id = '27888') m
+#	where
+#		u.user_id = m.member_id
+#   ) t
+#   order by user_name
+#"]
+#set pmfl_options [linsert $pmfl_options 0 [list "" 0]]
+
+
+
+
 
 
 # ------------------------------------------------------------
@@ -106,12 +136,12 @@ if {"" != $end_date && ![regexp {^[0-9][0-9][0-9][0-9]\-[0-9][0-9]\-[0-9][0-9]$}
 # ------------------------------------------------------------
 # Page Settings
 
-set page_title "FLL oder VLL laden"
+set page_title "FLer Rgen"
 set context_bar [im_context_bar $page_title]
 set context ""
 
 set help_text "
-<strong>TransferExport<br><br>
+<strong>FLer Rgen<br><br>
 
 "
 
@@ -132,28 +162,28 @@ from dual
 "
 db_1row last_date "
 select
-	to_char(sysdate::date  -365::integer, 'YYYY') as last_year,
-	to_char(sysdate::date  -30::integer, 'MM') as last_month,
+	to_char(sysdate::date  -1::integer, 'YYYY') as last_year,
+	to_char(sysdate::date  -1::integer, 'MM') as last_month,
 	to_char(sysdate::date  -1::integer, 'DD') as last_day
 from dual
 "
-
 db_1row next_date "
 select
-	to_char(sysdate::date  +365::integer, 'YYYY') as next_year,
-	to_char(sysdate::date  +30::integer, 'MM') as next_month,
+	to_char(sysdate::date  +1::integer, 'YYYY') as next_year,
+	to_char(sysdate::date  +1::integer, 'MM') as next_month,
 	to_char(sysdate::date  +1::integer, 'DD') as next_day
 from dual
 "
 
+
 if {"" == $start_date} { 
-	if { 21 <= $todays_day && $todays_day <= 31 } {
+	if { "21" <= $todays_day && $todays_day <= "31" } {
 	      set start_date "$todays_year-$todays_month-21"
-	  } elseif { 01 <= $todays_day && $todays_day <= 05 && 01 != $todays_month} {
+	  } elseif { "01" <= $todays_day && $todays_day <= "05" && "01" != $todays_month} {
 	      set start_date "$todays_year-$last_month-21"
-	  } elseif { 01 <= $todays_day && $todays_day <= 05 && 01 == $todays_month} {
+	  } elseif { "01" <= $todays_day && $todays_day <= "05" && "01" == $todays_month} {
 	      set start_date "$last_year-12-21"
-	  } elseif { 06 <= $todays_day && $todays_day <= 20 } {
+	  } elseif { "06" <= $todays_day && $todays_day <= "20" } {
 	      set start_date "$todays_year-$todays_month-06"
 	  }
 }
@@ -175,16 +205,29 @@ if {"" == $end_date} {
 # FLer open-bills url
 set comp_bills "/intranet-cost/list?order_by=Name&how_many=-1&view_name=cost_list&view_mode=view&start_date=$start_date&end_date=$end_date&cost_status_id=3804&cost_type_id=3704&company_id="
 
+#set comp_bills_short "/intranet-cost/list?order_by=Name&how_many=-1&view_name=cost_list&view_mode=view&cost_status_id=3804&cost_type_id=3704&company_id="
+#set comp_bills_short "/intranet-cust-fud/reports/etm_invoice_list?order_by=Name&how_many=-1&view_name=cost_list&view_mode=view&cost_status_id=3804&cost_type_id=3704&company_id="
+
+set comp_bills_short "/intranet-cust-fud/reports/etm_invoice_list?order_by=Document+%23&how_many=-1&view_name=etm_invoice_list&cost_status_id=&cost_type_id=3704&company_id="
+
+
+set comp_pos "/intranet-cost/list?order_by=Name&how_many=-1&view_name=cost_list&view_mode=view&start_date=$start_date&end_date=$end_date&cost_type_id=3704&company_id="
 # Provider setzen
 set provider_where ""
 if {"" != $provider_id && 0 != $provider_id} {
     set provider_where "and c.provider_id = :provider_id\n"
 }
-# PM setzen
-set pm_where ""
-if {"" != $creation_user && 0 != $creation_user} {
-    set pm_where "and acs.creation_user = :creation_user\n"
+
+# PMFLer setzen
+set pmfl_where ""
+if {"" != $pmfl && 0 != $pmfl} {
+    set pmfl_where "and acs.creation_user = :pmfl\n"
 }
+
+# Maxlevel is 3. 
+if {$level_of_detail > 3} { set level_of_detail 3 }
+
+
 
 # index
 
@@ -198,43 +241,7 @@ set kontokorr_case ""
 set iban_where ""
 set kontokorr ""
 
-#          if {[regexp {[fud_*]$} $agent]} {
-#		set kontokorr_case " 
-#		   case when im_name_from_id(c.template_id) like 'fud%' and comp.bank_iban is not NULL then 'FUD-DB'
-#			when im_name_from_id(c.template_id) like 'fud%' and comp.bank ~ '(P|p)ay(P|p)al' then 'FUD-PP'
-#			when im_name_from_id(c.template_id) like 'fud%' and (comp.bank like '%krill' or comp.bank like '%bookers') then 'FUD-MB'
-#		      end as kontokorr,
-#			"						
-#		set agent_where "AND im_name_from_id(c.template_id) LIKE 'fud%'"			
-#   }  elseif {[regexp {[pan_*]$} $agent]}  {
-#		set kontokorr_case " 
-#		   case when im_name_from_id(c.template_id) like 'pan%' and comp.bank_iban is not NULL then 'PAN-DB'
-#		     when im_name_from_id(c.template_id) like 'pan%' and comp.bank ~ '(P|p)ay(P|p)al' then 'PAN-PP'
-#		     when im_name_from_id(c.template_id) like 'pan%' and (comp.bank like '%krill' or comp.bank like '%bookers') then 'PAN-MB'
-#		   end as kontokorr,
-#		"						
-#		set agent_where "AND im_name_from_id(c.template_id) LIKE 'pan%'"	
-#   } elseif {[regexp {[zis_*]$} $agent]}  {
-#		set kontokorr_case " 
-#		   case when im_name_from_id(c.template_id like 'zis%' and comp.bank_iban is not NULL then 'ZIS-CB'
-#		     when im_name_from_id(c.template_id) like 'zis%' and comp.bank ~ '(P|p)ay(P|p)al' then 'ZIS-PP'
-#		     when im_name_from_id(c.template_id) like 'zis%' and (comp.bank like '%krill' or comp.bank like '%bookers') then 'ZIS-MB'
-#		   end as kontokorr,
-#		"						
-#		set agent_where "AND im_name_from_id(c.template_id) LIKE 'zis%'"	
-#   } else {set kontokorr ""}
 
-
-## iban, ohne_iban (rest) oder alle
-#         if {[regexp {[*_iban]$} $agent]} {
-#		set iban_where "AND comp.bank_iban is not NULL"					
-#   } elseif {[regexp {[*_rest]$} $agent]} {
-#		set iban_where "AND comp.bank_iban is NULL"	
-##   } elseif {[regexp {[*_alle]$} $agent]} {
-##		set iban_where ""				
-# 
-#  } else {}
-		
 
 						
 
@@ -287,8 +294,8 @@ set nointernals_where "\nAND comp.company_type_id not in (53,11000000)"
 	}	else {}
 	
 
-
-
+# voreinstellung auf current_user
+#set pmfl_where "AND acs.creation_user = :current_user_id"
 
 if { $effective_or_creation_date == "effective" } {
 		set effective_or_creation_date "c.effective_date"	
@@ -299,7 +306,7 @@ if { $effective_or_creation_date == "effective" } {
 if { $incl_paid == "incl_paid" } {
 		set paid_where ""	
 	} else {
-		set paid_where "AND c.cost_status_id != '3810'\nAND c.note is not null"	
+		set paid_where "AND c.cost_status_id != '3810'"	
 	}
 ### ------------------------------------------------------------
 ### Conditional SQL Where-Clause
@@ -337,8 +344,8 @@ if { ![empty_string_p $provider_where] } {
     set provider_where "$provider_where"
 }
 
-if { ![empty_string_p $pm_where] } {
-    set pm_where "$pm_where"
+if { ![empty_string_p $pmfl_where] } {
+    set pmfl_where "$pmfl_where"
 }
 # ------------------------------------------------------------
 # Define the report - SQL, counters, headers and footers 
@@ -360,15 +367,9 @@ select 	row_number() over (order by i.payment_method_id, comp.company_name) as p
 	     when comp.bank_swift is not null AND (length(replace(comp.bank_swift,' ','')) != 8 OR (length(replace(comp.bank_swift,' ',''))) != 11) then 'Format falsch ' || comp.bank_swift
 	     when comp.bank_sort_code is not null then replace(comp.bank_sort_code,' ','')
 	     else '' end as bic_sortcode,
-	case when c.currency != 'EUR' and c.vat is not null then 
-	 to_char(round(((c.amount + (c.amount * c.vat/100)) * 
-	  im_exchange_rate(c.effective_date::date, c.currency, 'EUR'))::numeric, 2), '9999999D99') 
-	     when c.currency != 'EUR' and c.vat is null then 
-	 to_char(round(((c.amount) * 
-	  im_exchange_rate(c.effective_date::date, c.currency, 'EUR'))::numeric, 2), '9999999D99') 
-	  else to_char((round(c.amount::numeric,2)), '9999999D99')
-	  end as betrag,
-	'EUR' as waehrung,
+	to_char((round(c.amount::numeric,2)), '9999999D99')  as betrag,
+	c.amount,
+	c.currency as waehrung,
 	c.cost_status_id,
 	im_name_from_id(c.cost_status_id) as coststatus,
 	c.cost_name,
@@ -377,21 +378,15 @@ select 	row_number() over (order by i.payment_method_id, comp.company_name) as p
 	comp.company_id + 60000000 as prov_konto,
 	case  when c.note is null then 'FL-RG Name FEHLT' else trim(from c.note) end as rgfl,
 	c.note,
-	comp.company_id || c.note as note_id_base,
+	--comp.company_id || c.note as note_id_base,
+	--regexp_replace(comp.company_id || to_char(c.effective_date, 'DDMMY') || c.note, \'\[\^0-9\]+\', '', 'g') as note_id,
+	--(comp.company_id || to_char(c.effective_date, 'DDMMYY') || substring((regexp_replace(c.note, \'\[\^0-9\]+\', '', 'g')) from char_length(regexp_replace(c.note, \'\[\^0-9\]+\', '', 'g')) -1)) as note_id,
+	case when c.note is null then comp.company_id || to_char(c.effective_date, 'DDMMY') ||'0' 
+	else (comp.company_id || to_char(c.effective_date, 'DDMMY') || substring((regexp_replace(c.note, \'\[\^0-9\]+\', '', 'g')) from char_length(regexp_replace(c.note, \'\[\^0-9\]+\', '', 'g')) -1)) end as note_id,
+	im_name_from_id(comp.company_id),	
 	comp.company_id,
-	case when length((trim(from c.note))) <= 23 then comp.company_id + 60000000 || ' ZA ' || trim(from c.note)  
-	     when length((trim(from c.note))) > 23 then comp.company_id + 60000000 || ' ZA ' || substr((trim(from c.note)),0,23)
-	     when c.note is null then 'FL-RG Name FEHLT'
-	   end as verwendungszweck_1,
-	case when length((trim(from c.note))) <= 23 then to_char(c.effective_date, 'YYYYMMDD')
-	     when length((trim(from c.note))) > 23 then   substr(c.note, 24,14)|| ' ' || to_char(c.effective_date, 'YYYYMMDD')
-	     when c.note is null then to_char(c.effective_date, 'YYYYMMDD')
-	   end as verwendungszweck_2,
-	c.cost_name as verwendungszweck_3,
-	case when c.currency != 'EUR' then round(c.amount,2) || ' ' || c.currency else '' end as verwendungszweck_4,
-	case when c.currency != 'EUR' then round(c.amount,2) end as orig_betrag,
+	c.cost_name as auftrag,
 	c.cost_id,
-	case when c.currency != 'EUR' then c.currency end as fremdwhrg,
 	$kontokorr_case
 	c.template_id,
 	case when im_name_from_id(c.template_id) like 'fud%' then 'FUD'
@@ -404,11 +399,11 @@ select 	row_number() over (order by i.payment_method_id, comp.company_name) as p
 	comp.bank,
 	comp.bank_acc_owner,
 	acs.creation_date,
-	to_char(acs.creation_date, 'YYYY.MM.DD HH24:MI:SS') as creation_date_formatted,
 	im_name_from_id(acs.creation_user) as creation_user,
 	acs.last_modified,
-	to_char(acs.last_modified, 'YYYY.MM.DD HH24:MI:SS') as last_modified_formatted,
+	c.effective_date,
 	to_char(c.effective_date, 'YYYY.MM.DD') as rg_datum,
+	to_char(c.effective_date, 'YYYY-MM-DD') as eff_datum,	
 	to_char(acs.creation_date, 'YYYY.MM.DD') as eintrag
 from	im_costs c ,
 	im_invoices i,
@@ -420,13 +415,12 @@ where 	c.provider_id = comp.company_id
 	and acs.creation_date >= to_date(:start_date, 'YYYY.MM.DD')
    	and acs.creation_date <= to_date(:end_date, 'YYYY.MM.DD')
 	and c.cost_type_id = '3704'
-	--and comp.bank is not null
 	$iban_where
 	$agent_where
 	$paid_where
 	$provider_where
-	$pm_where
-	order by i.payment_method_id, comp.company_name, c.note
+	$pmfl_where
+	order by comp.company_name, note_id
 "
 
 
@@ -434,48 +428,53 @@ where 	c.provider_id = comp.company_id
 
 
 	set report_def [list \
-		 group_by customer_id \
+		 group_by company_id \
 		 header {
-				$paym_index
-				$note_id
-				$agentur
-				"<a href=$company_url$company_id>$empfaenger</a>"
-				"<a href=$comp_bills$company_id>$company_name</a>"
-				$iban_accno
-				$bic_sortcode
-				$betrag
-				$waehrung
-				$orig_betrag
-				$fremdwhrg	
-				$prov_konto
-				$verwendungszweck_1
-				$verwendungszweck_2
-				"<a href=$invoice_url$cost_id>$verwendungszweck_3</a>"
-				$verwendungszweck_4
-				$bank
-				$payment_email
-				$payment_method
-				$rgfl
-				$rg_datum
-				$status
-				$cost_id
-				$creation_user
-				$creation_date_formatted
-				$last_modified_formatted
+				"\#colspan=4 <a href=$company_url$company_id>$company_name</a><br> 
+				$bankinfo
 				
-		 } \
-		 content {} \
-		 footer {} \
-	]
-
+				" 
+				
+		    } \
+			content [list \
+			    group_by note_id \
+			    header { } \
+			    content [list \
+				header {
+				""
+				""
+				"<a href=$comp_bills_short$company_id&start_date=$rg_datum&end_date=$rg_datum>$rg_datum</a><br>Eintrag: $eintrag"
+				$agentur
+				"<a href=$invoice_url$cost_id>$auftrag</a>"						
+				$betrag
+				$waehrung	
+				$creation_user
+				$status
+			 } \
+			 content {} \
+		] \
+		 footer {
+    		""
+		""
+		"" 
+		""
+		"<b>Total <i>$note</i></b>"  
+ 
+		"<nobr><i><b>$betrag_subtotal</b></i></nobr>" 
+		$waehrung <br> 
+		} \
+    ] \
+    footer {$openPOs_link_footer } \
+]
+#
 
 
 
 # Global header/footer
-set header0 {"Pos" "NoteID" "Agentur" "Empfaengername" "Company" "Kontonummer/IBAN" "Bankleitzahl/BIC" "Betrag" "Waehrung" "OrigBetrag" "Orig-Whrg" "Mandatsreferenz" "Verwendungszweck 1" "Verwendungszweck 2" "Verwendungszweck 3" "Verwendungszweck 4" "Bank" "Bezahl-Mail (PP/MB)" "Bezahlmethode" "RgFL" "Rg-Datum" "Status" "Cost_ID" "angelegt von" "Eintrags-Datum" "nachtraeglich geaendert?" }
+set header0 {"Company" "RgFL" "Rg-Datum" "Agentur" "Auftrag" "Betrag" "Waehrung" "angelegt von" "Status" }
+
+# Global Footer Line
 set footer0 {}
-
-
 
 
 # ------------------------------------------------------------
@@ -497,34 +496,16 @@ switch $output_format {
 	<form>
 	   [export_form_vars customer_id]
 	   <table border=0 cellspacing=1 cellpadding=1>
-	
   		<tr>
-		  <td class=form-label>Agentur</td>
+		  <td class=form-label>Eingetragen von:</td>
 		  <td class=form-widget>
-		    [im_select -translate_p 0 agent $agentauswahl $agent]
+		    [im_user_select -include_empty_p 1 -include_empty_name "All" -group_id "27888" pmfl $pmfl ]
 		  </td>
-
 		  <td class=form-label>Datum filtern nach</td>
 		  <td class=form-widget>
 		    [im_select -translate_p 0 effective_or_creation_date $effective_or_creation_date_auswahl $effective_or_creation_date]
 		  </td>
 		</tr>
-		<tr>
-		  <td class=form-label>Bezahlte anzeigen?</td>
-		  <td class=form-widget>
-		    [im_select -translate_p 0 incl_paid $incl_paid_auswahl $incl_paid]
-		  </td>
-
-		  <td class=form-label>Freelancer</td>
-		  <td class=form-widget>
-		    [im_company_select provider_id $provider_id "" "Provider"]
-		  </td>
-		  <td class=form-label>PM</td>
-		  <td class=form-widget>
-		    [im_user_select -include_empty_p 1 -group_id 27888 creation_user $creation_user ]
-		  </td>
-		</tr>
-
 
 		<tr>
 		  <td class=form-label>Start Date</td>
@@ -538,6 +519,28 @@ switch $output_format {
 		  </td>
 		</tr>
 
+		
+		<tr>
+		  <td class=form-label>Bezahlte anzeigen?</td>
+		  <td class=form-widget>
+		    [im_select -translate_p 0 incl_paid $incl_paid_auswahl $incl_paid]
+		  </td>
+
+		  <td>Level of<br>Details</td>
+		  <td>
+		    [im_select -translate_p 0 level_of_detail $levels $level_of_detail]
+		  </td>
+		</tr>
+		<tr>		
+		  <td class=form-label>Freelancer</td>
+		  <td class=form-widget>
+		    [im_company_select provider_id $provider_id "" "Provider"]
+		  </td>
+		</tr>
+
+
+
+<!--
                 <tr>
                   <td class=form-label>Format</td>
                   <td class=form-widget>
@@ -549,9 +552,15 @@ switch $output_format {
                     [im_report_number_locale_select number_locale $number_locale]
                   </td>
                 </tr>
+-->
+
 		<tr>
 		  <td class=form-label></td>
 		  <td class=form-widget><input type=submit value=Submit></td>
+				  <td></td>
+		  <td>
+		    <a href=$openpo_url> zurueck zur Uebersicht offener Auftraege</a>
+		  </td>
 		</tr>
 
 	 </table>
@@ -569,9 +578,45 @@ switch $output_format {
 }
 
 
+
+# *********************************************************
+# Counters 
+
+set betrag_subtotal_counter [list \
+        pretty_name "Invoice Amount" \
+        var betrag_subtotal \
+        reset \$note_id \
+        expr "\$amount+0" \
+]
+
+#
+# Grand Total Counters
+#
+#set betrag_grand_total_counter [list \
+#        pretty_name "Invoice Amount" \
+#        var betrag_total \
+#        reset 0 \
+#        expr "\$amount+0" \
+]
+
+set counters [list \
+	$betrag_subtotal_counter \
+]
+#aus counters entfernt	$betrag_grand_total_counter \
+
+
+# Set the values to 0 as default
+#set betrag_total 0
+
+
+
+
+
+
 # ------------------------------------------------------------
 # Start formatting the report body
 #
+
 
 im_report_render_row \
     -output_format $output_format \
@@ -583,6 +628,9 @@ im_report_render_row \
 set footer_array_list [list]
 set last_value_list [list]
 set class "rowodd"
+
+set counter 0
+set class ""
 
 ns_log Notice "intranet-reporting-finance/finance-income-statement: sql=\n$sql"
 
@@ -611,31 +659,10 @@ if {"" != $rgfl} { regsub -all {[ü]}  $rgfl "ue" rgfl}
 if {"" != $rgfl} { regsub -all {[Ü]}  $rgfl "Ue" rgfl}
 if {"" != $rgfl} { regsub -all {[^a-zA-Z0-9[:space:]]}  $rgfl "_" rgfl}
 
-if {"" != $verwendungszweck_1} { regsub -all {[ä]}  $verwendungszweck_1 "ae" verwendungszweck_1}
-if {"" != $verwendungszweck_1} { regsub -all {[Ä]}  $verwendungszweck_1 "Ae" verwendungszweck_1}
-if {"" != $verwendungszweck_1} { regsub -all {[ö]}  $verwendungszweck_1 "oe" verwendungszweck_1}
-if {"" != $verwendungszweck_1} { regsub -all {[Ö]}  $verwendungszweck_1 "Oe" verwendungszweck_1}
-if {"" != $verwendungszweck_1} { regsub -all {[ü]}  $verwendungszweck_1 "ue" verwendungszweck_1}
-if {"" != $verwendungszweck_1} { regsub -all {[Ü]}  $verwendungszweck_1 "Ue" verwendungszweck_1}
-if {"" != $verwendungszweck_1} { regsub -all {[^a-zA-Z0-9[:space:]]}  $verwendungszweck_1 "_" verwendungszweck_1}
 
-if {"" != $verwendungszweck_2} { regsub -all {[ä]}  $verwendungszweck_2 "ae" verwendungszweck_2}
-if {"" != $verwendungszweck_2} { regsub -all {[Ä]}  $verwendungszweck_2 "Ae" verwendungszweck_2}
-if {"" != $verwendungszweck_2} { regsub -all {[ö]}  $verwendungszweck_2 "oe" verwendungszweck_2}
-if {"" != $verwendungszweck_2} { regsub -all {[Ö]}  $verwendungszweck_2 "Oe" verwendungszweck_2}
-if {"" != $verwendungszweck_2} { regsub -all {[ü]}  $verwendungszweck_2 "ue" verwendungszweck_2}
-if {"" != $verwendungszweck_2} { regsub -all {[Ü]}  $verwendungszweck_2 "Ue" verwendungszweck_2}
-if {"" != $verwendungszweck_2} { regsub -all {[^a-zA-Z0-9[:space:]]}  $verwendungszweck_2 "_" verwendungszweck_2}
 
-if {"" != $verwendungszweck_3} { regsub -all {[ä]}  $verwendungszweck_3 "ae" verwendungszweck_3}
-if {"" != $verwendungszweck_3} { regsub -all {[Ä]}  $verwendungszweck_3 "Ae" verwendungszweck_3}
-if {"" != $verwendungszweck_3} { regsub -all {[ö]}  $verwendungszweck_3 "oe" verwendungszweck_3}
-if {"" != $verwendungszweck_3} { regsub -all {[Ö]}  $verwendungszweck_3 "Oe" verwendungszweck_3}
-if {"" != $verwendungszweck_3} { regsub -all {[ü]}  $verwendungszweck_3 "ue" verwendungszweck_3}
-if {"" != $verwendungszweck_3} { regsub -all {[Ü]}  $verwendungszweck_3 "Ue" verwendungszweck_3}
-if {"" != $verwendungszweck_3} { regsub -all {[^a-zA-Z0-9[:space:]]}  $verwendungszweck_3 "_" verwendungszweck_3}
 
-if {"" != $note_id_base} { regsub -all {[^0-9]}  $note_id_base "" note_id}
+#if {"" != $note_id_base} { regsub -all {[^0-9]}  $note_id_base "" note_id}
 
 
 ##set sonderzeichen_felder_list [list "empfaenger" "rgfl" "verwendungszweck_1" "verwendungszweck_2" "verwendungszweck_3" LAST]
@@ -658,24 +685,55 @@ if {"" != $note_id_base} { regsub -all {[^0-9]}  $note_id_base "" note_id}
 	set customer_name [lang::message::lookup "" intranet-reporting.No_customer "Undefined Customer"]
    }
 
-# check ob nachtraeglich veraendert
-    if {$creation_date ne $last_modified} {
-	set changed "wurde am <font color=red>$last_modified</font> nachtraeglich geaendert"
-	} else { set changed ""}
-
-    if {$creation_date ne $last_modified} {
-	set last_modified_formatted $last_modified_formatted
-	} else { set last_modified_formatted ""}
+## check ob nachtraeglich veraendert
+#    if {$creation_date ne $last_modified} {
+#	set changed "wurde am <font color=red>$last_modified_formatted</font> nachtraeglich geaendert"
+#	} else { set changed ""}
 
 # auf status 'bezahlt' pruefen
     if { 3810 == $cost_status_id } {
-	set betrag "<font color=red>bezahlt: $betrag</font>"}
+	set betrag "<font color=red>$betrag</font>"
+	set note "<font color=red>$note (BEZAHLT)</font>"
+	set status "<font color=red>$status</font>"
+	}
 
-# fehlender FL-Rg-Name
-    if { "" == $note } {
-	set verwendungszweck_1 "<font color=red>$verwendungszweck_1</font>"} 
-    if { "" == $note } {
-	set rgfl "<font color=red>$rgfl</font>"} 
+## fehlender FL-Rg-Name
+#    if { "" == $note } {
+#	set verwendungszweck_1 "<font color=red>$verwendungszweck_1</font>"} 
+#    if { "" == $note } {
+#	set rgfl "<font color=red>$rgfl</font>"} 
+
+
+# bankinfo ein/ausblenden
+
+     if { 3 == $level_of_detail } {
+	set bankinfo "		Empfaenger: $empfaenger <br>
+				<a> $payment_method</a><br>
+				<a> $bank</a><br>
+				<a> $iban_accno</a><br>
+				<a> $bic_sortcode</a><br>
+				<a> $payment_email</a><br>
+			"
+	set openPOs_link_footer "\#colspan=9 *******************************************************<a href=$openpo_url$company_id> offene Auftraege anzeigen fuer $company_name</a> *********************************************************<br><br>"	
+	} else { 
+		set bankinfo "" 
+		set openPOs_link_footer ""		
+		}
+
+
+     if {"" == $note } {
+	set note "<font color=red>RgNr fehlt!!!!!</font>"}
+
+# anpassen von datum fuer bill-link
+########## ab tcl 8.5 da format flag nicht unterstuetzt in 8.4 ###########
+#	set aux_dateformat {%Y-%m-%d}
+#	set eff_datum [	clock scan $eff_datum -format %Y-%m-%d ]
+#	set aux_startdate [clock add $eff_datum -1 day ]
+#	set aux_startdate [clock format $aux_startdate -format %Y-%m-%d]
+#	set aux_enddate [clock add $eff_datum 1 day ]
+#	set aux_enddate [clock format $aux_enddate -format %Y-%m-%d]	
+############################################################################
+
 
 
 
@@ -688,6 +746,7 @@ if {"" != $note_id_base} { regsub -all {[^0-9]}  $note_id_base "" note_id}
 	-row_class $class \
 	-cell_class $class
 
+	im_report_update_counters -counters $counters
    
     
     set last_value_list [im_report_render_header \
@@ -707,6 +766,9 @@ if {"" != $note_id_base} { regsub -all {[^0-9]}  $note_id_base "" note_id}
 	    -row_class $class \
 	    -cell_class $class
     ]
+
+	incr counter
+
 }
 
 im_report_display_footer \
