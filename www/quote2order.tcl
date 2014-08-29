@@ -73,6 +73,8 @@ if {28022 == $interco_company_id} {
 # change the project_nr
 db_dml update_project_nr "update im_projects set project_nr = :project_nr, project_name = :project_nr, project_status_id = [im_project_status_open],start_date = now(), end_date = :new_end_date where project_id = :project_id"
 
+ns_log Notice "Quote2Order Change project number to $project_nr"
+
 # Set the customer to active if not already done so
 
 if {[im_company_status_active] != $company_status_id} {
@@ -101,6 +103,7 @@ if {"" != $quote_id} {
     db_dml update_invoice_nr "update im_invoices set invoice_nr = :invoice_nr where invoice_id = :invoice_id"
 }
 
+ns_log Notice "Updated invoices"
 # Change the template of the Offer and change the name.
 set confirmation_nr "C$project_nr"
 set confirmation_template_id [db_string confirmation_id "select aux_int2 from im_categories, im_costs where template_id = category_id and cost_id = :quote_id"]
@@ -108,18 +111,20 @@ set confirmation_template_id [db_string confirmation_id "select aux_int2 from im
 db_dml update_quote "update im_costs set cost_name = :confirmation_nr, template_id = :confirmation_template_id, effective_date = now(), delivery_date = :new_end_date where cost_id = :quote_id"
 db_dml update_invoice_nr "update im_invoices set invoice_nr = :confirmation_nr where invoice_id = :quote_id"
 
+ns_log Notice "Updated confirmation number and template"
+
 # Move the folder to the new project_path
 if {[file exists $old_project_path]} {
     file rename $old_project_path [im_filestorage_project_path_helper $project_id]
-    util_memoize_flush [list im_filestorage_base_path_helper project $project_id]
 }
+
+util_memoize_flush [list im_filestorage_base_path_helper project $project_id]
+util_memoize_flush [list im_filestorage_project_path_helper $project_id]
+
+ns_log Notice "renamed the files from $old_project_path to [im_filestorage_project_path_helper $project_id]"
 
 # Write Audit Trail
 im_project_audit -project_id $project_id -type_id $project_type_id -status_id $project_status_id -action after_update
-
-# -----------------------------------------------------------------
-# Call the "project_create" or "project_update" user_exit
-im_user_exit_call project_update $project_id
 
 # Forward the Users to the new invoice view.tcl page
 ad_returnredirect "/intranet-invoices/view?invoice_id=$invoice_id"
