@@ -70,8 +70,8 @@ if {28022 == $interco_company_id} {
     set project_nr "Z$project_nr"
 }
 
-# change the project_nr
-db_dml update_project_nr "update im_projects set project_nr = :project_nr, project_name = :project_nr, project_status_id = [im_project_status_open],quote_nr = :original_project_nr, quote_date = :start_date, start_date = now(), end_date = :new_end_date where project_id = :project_id"
+# change the project_nr and record the new project_nr in the quote
+db_dml update_project_nr "update im_projects set project_nr = :project_nr, project_path = :project_nr, project_name = :project_nr, project_status_id = [im_project_status_open],quote_nr = :original_project_nr, quote_date = :start_date, start_date = now(), end_date = :new_end_date where project_id = :project_id"
 
 ns_log Notice "Quote2Order Change project number to $project_nr"
 
