@@ -44,7 +44,7 @@ if {"" != $invoice_id} {
 }
 
 # Get all information about the quote and customer and project
-db_1row customer_and_project_info "select project_type_id, project_status_id, now() as effective_date, c.company_id, p.start_date, p.end_date, p.interco_company_id, p.processing_time, to_char(now(),'YYYY-MM-DD') as new_start_date, to_char(end_date, 'HH24:MI') as end_time, company_status_id from im_projects p, im_companies c where p.company_id = c.company_id and p.project_id = :project_id"
+db_1row customer_and_project_info "select project_type_id, project_status_id, now() as effective_date, project_nr as original_project_nr, c.company_id, p.start_date, p.end_date, p.interco_company_id, p.processing_time, to_char(now(),'YYYY-MM-DD') as new_start_date, to_char(end_date, 'HH24:MI') as end_time, company_status_id from im_projects p, im_companies c where p.company_id = c.company_id and p.project_id = :project_id"
 
 # Get the old project path
 set old_project_path [im_filestorage_project_path $project_id]
@@ -71,7 +71,7 @@ if {28022 == $interco_company_id} {
 }
 
 # change the project_nr
-db_dml update_project_nr "update im_projects set project_nr = :project_nr, project_name = :project_nr, project_status_id = [im_project_status_open],start_date = now(), end_date = :new_end_date where project_id = :project_id"
+db_dml update_project_nr "update im_projects set project_nr = :project_nr, project_name = :project_nr, project_status_id = [im_project_status_open],quote_nr = :original_project_nr, quote_date = :start_date, start_date = now(), end_date = :new_end_date where project_id = :project_id"
 
 ns_log Notice "Quote2Order Change project number to $project_nr"
 
