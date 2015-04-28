@@ -751,3 +751,27 @@ ad_proc -public -callback im_invoice_after_update -impl aa_fud_store_invoice {
     # Create the invoice
     fud_create_invoice_pdf -invoice_id $object_id
 }
+
+
+
+ad_proc -publick -callback im_project_new_redirect -impl aa_fud_trans_redirect {
+    {-object_id ""}
+    {-status_id ""}
+    {-type_id ""}
+    {-project_id ""}
+    {-parent_id ""}
+    {-company_id ""}
+    {-project_type_id ""}
+    {-project_name ""}
+    {-project_nr ""}
+    {-workflow_key ""}
+    {-return_url ""}
+} {
+    redirect
+} {
+
+# Returnredirect to translations for translation projects
+    if {[apm_package_installed_p "intranet-translation"] && [im_category_is_a $project_type_id [im_project_type_translation]] && $project_id == ""} {
+	ad_returnredirect [export_vars -base "/intranet-translation/projects/new" -url {project_type_id {project_status_id $status_id} company_id parent_id project_nr project_name workflow_key return_url project_id}]
+    }
+}
