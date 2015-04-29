@@ -754,7 +754,7 @@ ad_proc -public -callback im_invoice_after_update -impl aa_fud_store_invoice {
 
 
 
-ad_proc -publick -callback im_project_new_redirect -impl aa_fud_trans_redirect {
+ad_proc -public -callback im_project_new_redirect -impl aa_fud_trans_redirect {
     {-object_id ""}
     {-status_id ""}
     {-type_id ""}
