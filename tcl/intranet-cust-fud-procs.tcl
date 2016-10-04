@@ -775,3 +775,67 @@ ad_proc -public -callback im_project_new_redirect -impl aa_fud_trans_redirect {
 	ad_returnredirect [export_vars -base "/intranet-translation/projects/new" -url {project_type_id company_id parent_id project_nr project_name workflow_key return_url}]
     }
 }
+
+
+
+# etm defaults
+# company defaults
+# invoice-template new company
+ad_proc -public im_etm_invoicetemplate_default {} {
+	set invt ""
+	
+	if {[im_profile::member_p -profile_id 467 -user_id [ad_conn user_id]]} {
+	  switch -glob [im_email_from_user_id_helper [ad_conn user_id]] {
+	    *@fachuebersetzungsdienst.com {set invt 11000249} 
+	    *@panoramalanguages.com {set invt 11000300} 
+	    *@fachuebersetzungsagentur.com {set invt 11000228}
+	    *@fachuebersetzungsservice.com {set invt 11000228}
+	    }
+	    return $invt
+	} else { return "" }
+}
+
+
+# quote-template new company
+ad_proc -public im_etm_quotetemplate_default {} {
+	set qtt ""
+	
+	if {[im_profile::member_p -profile_id 467 -user_id [ad_conn user_id]]} {
+	  switch -glob [im_email_from_user_id_helper [ad_conn user_id]] {
+	    *@fachuebersetzungsdienst.com {set qtt 11000253} 
+	    *@panoramalanguages.com {set qtt 11000304} 
+	    *@fachuebersetzungsagentur.com {set qtt 11000220}
+	    *@fachuebersetzungsservice.com {set qtt 11000220}
+	    }
+	    return $qtt
+	  } else { return "" }
+}
+
+# vat-rate default
+ad_proc -public im_etm_vatbyagent_default {} {
+	set vat ""
+	
+	#if {[im_profile::member_p -profile_id 467 -user_id [ad_conn user_id]]} {
+	  switch -glob [im_email_from_user_id_helper [ad_conn user_id]] {
+	    *@fachuebersetzungsdienst.com {set vat 42030} 
+	    *@panoramalanguages.com {set vat 42030} 
+	    *@fachuebersetzungsagentur.com {set vat 11000290}
+	    *@fachuebersetzungsservice.com {set vat 11000290}
+	    }
+	    return $vat
+	#} else { return "" }
+}
+
+
+# new project defaults
+ad_proc -public im_etm_agency_by_cm_default {} {
+	set agency_default ""
+	if {[im_user_is_employee_p -user_id [ad_conn user_id]]} {
+	  switch -glob [im_email_from_user_id_helper [ad_conn user_id]] {
+	    *@fachuebersetzungsdienst.com {set agency_default 28022} 
+	    *@panoramalanguages.com {set agency_default 552735} 
+	    *@fachuebersetzungsagentur.com {set agency_default 279215}
+	    *@fachuebersetzungsservice.com {set agency_default 279215}
+	    }
+	    return $agency_default
+}

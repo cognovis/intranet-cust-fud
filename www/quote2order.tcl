@@ -95,6 +95,7 @@ db_dml change_task_end_dates "update im_trans_tasks set end_date = :new_end_date
 # else project_end_date
 
 set quote_id [db_string quote "select cost_id from im_costs where project_id = :project_id and cost_type_id = [im_cost_type_quote] order by cost_id desc limit 1" -default ""]
+set quote_nr [db_string quote "select cost_name from im_costs where project_id = :project_id and cost_type_id = [im_cost_type_quote] order by cost_id desc limit 1" -default ""]
 if {"" != $quote_id} {
     # Copy the invoice
     set invoice_id [im_invoice_copy_new -source_invoice_ids $quote_id -target_cost_type_id [im_cost_type_invoice]]
@@ -105,7 +106,9 @@ if {"" != $quote_id} {
 
 ns_log Notice "Updated invoices"
 # Change the template of the Offer and change the name.
-set confirmation_nr "C$project_nr"
+
+set quotenr "-$quote_nr"
+set confirmation_nr "C$project_nr$quotenr"
 set confirmation_template_id [db_string confirmation_id "select aux_int2 from im_categories, im_costs where template_id = category_id and cost_id = :quote_id"]
 
 db_dml update_quote "update im_costs set cost_name = :confirmation_nr, template_id = :confirmation_template_id, effective_date = now(), delivery_date = :new_end_date where cost_id = :quote_id"
@@ -118,10 +121,33 @@ if {[file exists $old_project_path]} {
     file rename $old_project_path [im_filestorage_project_path_helper $project_id]
 }
 
+
 util_memoize_flush [list im_filestorage_base_path_helper project $project_id]
 util_memoize_flush [list im_filestorage_project_path_helper $project_id]
 
 ns_log Notice "renamed the files from $old_project_path to [im_filestorage_project_path_helper $project_id]"
+
+
+# add folder "Zusicherung" if order includes a certified translation
+set certified [db_string certif "select certified_translation from im_projects where project_id = :project_id"]
+if { "t" == $certified } { 
+	set dir_name Zusicherung
+	set project_dir [im_filestorage_project_path $project_id]
+	set zusicherung_dir "$project_dir/$dir_name"
+	ns_log Notice "im_filestorage_create_directories: zusicherung_dir=$zusicherung_dir"
+	if {[catch {
+	    if {![file exists $zusicherung_dir]} {
+		ns_log Notice "exec /bin/mkdir -p $zusicherung_dir"
+		exec /bin/mkdir -p $zusicherung_dir
+		ns_log Notice "exec /bin/chmod ug+w $zusicherung_dir"
+		exec /bin/chmod ug+rw $zusicherung_dir
+	    } 
+	} err_msg]} { return $err_msg }
+    } 
+
+
+
+
 
 # Write Audit Trail
 im_project_audit -project_id $project_id -type_id $project_type_id -status_id $project_status_id -action after_update
