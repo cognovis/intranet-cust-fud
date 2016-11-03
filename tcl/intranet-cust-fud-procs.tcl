@@ -86,10 +86,12 @@ ad_proc -public fud_member_list {
     }
 }
 
+
+#procs update 
 ad_proc -public fud_update_old_projects {
     
 } {
-    Könntest Du bitte noch diese KV-Status-Aktualisierung einmal pro Tag (Woche würde auch reichen) über die DB rasen lassen
+    change quote project status after 30 days without answer
 } {
     db_dml update_kv_status {
 	UPDATE im_projects  SET project_status_id = 11000007 
@@ -98,6 +100,21 @@ ad_proc -public fud_update_old_projects {
 	AND project_nr LIKE '1%'
     }
 }
+
+
+
+ad_proc -public etm_update_wrong_order_status {
+    
+} {
+    change invoice status to outstanding if set to created 
+} {
+    db_dml update_kv_status {
+      update im_costs set cost_status_id = 3804 
+      where cost_type_id = 3700
+      and cost_status_id = 3802
+    }
+}
+
 
 
 # ---------------------------------------------------------------
@@ -838,4 +855,9 @@ ad_proc -public im_etm_agency_by_cm_default {} {
 	    *@fachuebersetzungsservice.com {set agency_default 279215}
 	    }
 	    return $agency_default
+	    }
 }
+
+
+
+

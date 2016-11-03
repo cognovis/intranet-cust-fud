@@ -1,4 +1,4 @@
-# packages/intranet-collmex/tcl/intranet-collmex-procs.tcl
+# packages/intranet-cust-fud/tcl/intranet-cust-fud-init.tcl
 
 ## Copyright (c) 2011, cognovís GmbH, Hamburg, Germany
 # This program is free software: you can redistribute it and/or modify
@@ -25,4 +25,6 @@ ad_library {
 }
 
 ad_schedule_proc -thread t 3600 fud_update_old_projects
+
+ad_schedule_proc -thread t 3600 etm_update_wrong_order_status
 
